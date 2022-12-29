@@ -1,0 +1,4 @@
+# Ignore botToken.py
+botToken.py
+# Ignore .db
+*.db
