@@ -1,0 +1,2 @@
+token = 'Insert your Token Here'
+enviro = 'prod' # Can be dev or prod

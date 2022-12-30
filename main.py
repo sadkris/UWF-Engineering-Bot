@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 import os
 import sqlite3
-import botToken
+import botConfig
 
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
@@ -13,22 +13,29 @@ cur = con.cursor()
 cur.execute('CREATE TABLE IF NOT EXISTS classes (name TEXT, description TEXT)')
 con.commit()
 
+# Switch case, if botConfig.enviro is dev, set guild ID to 614524029381902357, if it's prod set it to 743809429039874108
+if botConfig.enviro == 'dev':
+    guild = discord.Object(id=614524029381902357)
+elif botConfig.enviro == 'prod':
+    guild = discord.Object(id=743809429039874108)
+
 @client.event
 async def on_ready():
-    await tree.sync(guild=discord.Object(id=743809429039874108))
+    await tree.sync(guild=guild)
     print('Logged in as')
     print(client.user.name)
     print(client.user.id)
     print('------')
 
-def checkAdmin(interaction):
+async def checkAdmin(interaction):
     return not discord.utils.get(interaction.user.roles, name='Admin') and not discord.utils.get(interaction.user.roles, name='Moderator')
 
-@tree.command(name = 'createclass', description = 'Create a class', guild=discord.Object(id=743809429039874108))
+@tree.command(name = 'createclass', description = 'Create a class', guild=guild)
 async def createclass(interaction, name: str, description: str):
+    createClassCur = con.cursor()
     """Create a class"""
     # Check if user has Admin or Moderator role
-    if checkAdmin(interaction):
+    if await checkAdmin(interaction):
         await interaction.response.send_message('You do not have permission to use this command')
         return
     # Check if class already exists
@@ -47,15 +54,16 @@ async def createclass(interaction, name: str, description: str):
     await guild.create_text_channel(name=description, category=category, overwrites=overwrites)
     await guild.create_voice_channel(name=description, category=category, overwrites=overwrites)
     # Insert class into database
-    cur.execute('INSERT INTO classes VALUES (?, ?)', (name, description))
+    createClassCur.execute('INSERT INTO classes VALUES (?, ?)', (name, description))
     con.commit()
     await interaction.response.send_message('Class "' + name + " " + description + '" created')
 
-@tree.command(name = 'deleteclass', description = 'Delete a class', guild=discord.Object(id=743809429039874108))
+@tree.command(name = 'deleteclass', description = 'Delete a class', guild=guild)
 async def deleteclass(interaction, name: str):
     """Delete a class"""
+    deleteClassCur = con.cursor()
     # Check if user has Admin or Moderator role
-    if checkAdmin(interaction):
+    if await checkAdmin(interaction):
         await interaction.response.send_message('You do not have permission to use this command')
         return
     # Check if class exists
@@ -67,23 +75,24 @@ async def deleteclass(interaction, name: str):
     await role.delete()
     # Delete text and voice channel
     # Grab class description from database
-    cur.execute('SELECT description FROM classes WHERE name = ?', (name,))
-    description = cur.fetchone()[0]
+    deleteClassCur.execute('SELECT description FROM classes WHERE name = ?', (name,))
+    description = deleteClassCur.fetchone()[0]
     category = discord.utils.get(interaction.guild.categories, name=description)
     for channel in category.channels:
         await channel.delete()
     await category.delete()
     # Delete class from database
-    cur.execute('DELETE FROM classes WHERE name = ?', (name,))
+    deleteClassCur.execute('DELETE FROM classes WHERE name = ?', (name,))
     con.commit()
     await interaction.response.send_message('Class "' + name + '" deleted')
 
-@tree.command(name = 'addclass', description = 'Add a class', guild=discord.Object(id=743809429039874108))
+@tree.command(name = 'addclass', description = 'Add a class', guild=guild)
 async def addclass(interaction, name: str):
     """Add a class"""
+    addClassCur = con.cursor()
     # Check that class exists in database
-    cur.execute('SELECT name FROM classes WHERE name = ?', (name,))
-    allowed_roles = [x[0] for x in cur.fetchall()]
+    addClassCur.execute('SELECT name FROM classes WHERE name = ?', (name,))
+    allowed_roles = [x[0] for x in addClassCur.fetchall()]
     if name not in allowed_roles:
         await interaction.response.send_message('Class does not exist')
         return
@@ -96,12 +105,13 @@ async def addclass(interaction, name: str):
     await interaction.user.add_roles(role)
     await interaction.response.send_message('Class "' + name + '" added')
 
-@tree.command(name = 'removeclass', description = 'Remove a class', guild=discord.Object(id=743809429039874108))
+@tree.command(name = 'removeclass', description = 'Remove a class', guild=guild)
 async def removeclass(interaction, name: str):
+    removeClassCur = con.cursor()
     """Remove a class"""
     # Check that class exists in database
-    cur.execute('SELECT name FROM classes WHERE name = ?', (name,))
-    allowed_roles = [x[0] for x in cur.fetchall()]
+    removeClassCur.execute('SELECT name FROM classes WHERE name = ?', (name,))
+    allowed_roles = [x[0] for x in removeClassCur.fetchall()]
     if name not in allowed_roles:
         await interaction.response.send_message('Class does not exist')
         return
@@ -114,4 +124,4 @@ async def removeclass(interaction, name: str):
     await interaction.user.remove_roles(role)
     await interaction.response.send_message('Class "' + name + '" removed')
 
-client.run(botToken.token)
+client.run(botConfig.token)

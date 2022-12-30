@@ -1,4 +1,7 @@
-# Ignore botToken.py
-botToken.py
+# Ignore botConfig.py
+botConfig.py
 # Ignore .db
 *.db
+
+# Ignore __pycache__
+__pycache__
